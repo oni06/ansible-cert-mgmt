@@ -1,0 +1,27 @@
+# ACME challenge type: dns-01, http-01, or tls-alpn-01
+acme_challenge_type: dns-01
+
+domain_name: app.example.com
+
+# Subject Alternative Names - include the primary domain_name as the first entry
+subject_alt_name:
+  - app.example.com
+  - app-alt1.example.com
+
+# Key type: RSA or ECC
+key_type: RSA
+
+# RSA key size (ignored for ECC): 2048, 3072, or 4096
+key_size: 4096
+
+# ECC curve (ignored for RSA): secp256r1, secp384r1, or secp521r1
+key_curve: secp384r1
+
+# CSR subject fields
+organization_name: "My Organization"
+country_name: US
+
+# DNS provider for ACME challenge validation
+# Supported values: dnsmadeeasy, cloudflare
+# Credentials must exist in vars/dns_providers/<dns_provider>.yml
+dns_provider: dnsmadeeasy

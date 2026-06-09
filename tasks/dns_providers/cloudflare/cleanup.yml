@@ -1,0 +1,11 @@
+---
+- name: Remove Cloudflare TXT challenge records
+  community.general.cloudflare_dns:
+    api_token: "{{ cloudflare_api_token }}"
+    zone: "{{ item | regex_replace('^[^\\.]+\\.', '') }}"
+    record: "{{ acme_challenge['challenge_data'][item][acme_challenge_type].record | regex_replace('^(_acme-challenge\\.[^\\.]+)\\..*$', '\\1') }}"
+    type: TXT
+    value: "{{ acme_challenge['challenge_data'][item][acme_challenge_type].resource_value }}"
+    state: absent
+  loop: "{{ subject_alt_name }}"
+  when: item in acme_challenge.challenge_data
