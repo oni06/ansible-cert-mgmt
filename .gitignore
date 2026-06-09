@@ -1,0 +1,6 @@
+.DS_Store
+.ansible/
+.vscode/
+account/
+certs/
+vars/main.yml
