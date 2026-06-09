@@ -4,3 +4,8 @@
 account/*
 certs/*
 vars/main.yml
+vars/acme_account.yml
+vars/certs/
+vars/dns_providers/
+!vars/certs/example.yml.sample
+!vars/dns_providers/dnsmadeeasy.yml.sample

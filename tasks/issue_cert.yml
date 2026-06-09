@@ -1,0 +1,113 @@
+---
+- name: Load certificate configuration
+  ansible.builtin.include_vars:
+    file: "{{ cert_config_file }}"
+
+- name: Load DNS provider credentials
+  ansible.builtin.include_vars:
+    file: "vars/dns_providers/{{ dns_provider }}.yml"
+
+- name: Create certificate output directory
+  ansible.builtin.file:
+    path: "certs/{{ domain_name }}"
+    state: directory
+    mode: "u=rwx,g=x,o=x"
+
+- name: Generate RSA certificate private key
+  community.crypto.openssl_privatekey:
+    path: "certs/{{ domain_name }}/privkey.pem"
+    type: RSA
+    size: "{{ key_size | default(4096) }}"
+    cipher: auto
+    passphrase: "{{ lookup('ansible.builtin.password', 'certs/' ~ domain_name ~ '/passphrase.txt', length=25) }}"
+  when: key_type | default('RSA') | upper == 'RSA'
+
+- name: Generate ECC certificate private key
+  community.crypto.openssl_privatekey:
+    path: "certs/{{ domain_name }}/privkey.pem"
+    type: ECC
+    curve: "{{ key_curve | default('secp384r1') }}"
+    cipher: auto
+    passphrase: "{{ lookup('ansible.builtin.password', 'certs/' ~ domain_name ~ '/passphrase.txt', length=25) }}"
+  when: key_type | default('RSA') | upper == 'ECC'
+
+- name: Generate Certificate Signing Request
+  community.crypto.openssl_csr:
+    path: "certs/{{ domain_name }}/cert.csr"
+    privatekey_path: "certs/{{ domain_name }}/privkey.pem"
+    privatekey_passphrase: "{{ lookup('ansible.builtin.password', 'certs/' ~ domain_name ~ '/passphrase.txt', length=25) }}"
+    common_name: "{{ domain_name }}"
+    subject_alt_name: "{{ subject_alt_name | map('regex_replace', '^', 'DNS:') | list }}"
+    country_name: "{{ country_name | default('US') }}"
+    organization_name: "{{ organization_name | default(omit) }}"
+    email_address: "{{ acme_email }}"
+
+- name: Submit ACME certificate order
+  community.crypto.acme_certificate:
+    acme_directory: "{{ acme_directory }}"
+    acme_version: "{{ acme_version }}"
+    account_key_src: "{{ acme_account_key }}"
+    account_email: "{{ acme_email }}"
+    modify_account: false
+    terms_agreed: true
+    challenge: "{{ acme_challenge_type }}"
+    csr: "certs/{{ domain_name }}/cert.csr"
+    dest: "certs/{{ domain_name }}/cert.pem"
+    chain_dest: "certs/{{ domain_name }}/chain.pem"
+    fullchain_dest: "certs/{{ domain_name }}/fullchain.pem"
+    remaining_days: 91
+  register: acme_challenge
+
+- name: Create DNS challenge records
+  ansible.builtin.include_tasks: "tasks/dns_providers/{{ dns_provider }}/create.yml"
+  when: acme_challenge is changed
+
+- name: Pause for DNS propagation
+  ansible.builtin.pause:
+    minutes: 5
+  when: acme_challenge is changed
+
+- name: Validate ACME challenge and retrieve certificate
+  community.crypto.acme_certificate:
+    acme_directory: "{{ acme_directory }}"
+    acme_version: "{{ acme_version }}"
+    account_key_src: "{{ acme_account_key }}"
+    account_email: "{{ acme_email }}"
+    modify_account: false
+    terms_agreed: true
+    challenge: "{{ acme_challenge_type }}"
+    csr: "certs/{{ domain_name }}/cert.csr"
+    dest: "certs/{{ domain_name }}/cert.pem"
+    chain_dest: "certs/{{ domain_name }}/chain.pem"
+    fullchain_dest: "certs/{{ domain_name }}/fullchain.pem"
+    remaining_days: 91
+    data: "{{ acme_challenge }}"
+  when: acme_challenge is changed
+
+- name: Cleanup DNS challenge records
+  ansible.builtin.include_tasks: "tasks/dns_providers/{{ dns_provider }}/cleanup.yml"
+  when: acme_challenge is changed
+
+- name: Create PFX certificate bundle
+  community.crypto.openssl_pkcs12:
+    action: export
+    friendly_name: "{{ domain_name }}"
+    passphrase: "{{ lookup('ansible.builtin.password', 'certs/' ~ domain_name ~ '/passphrase.txt', length=25) }}"
+    path: "certs/{{ domain_name }}/cert.pfx"
+    privatekey_path: "certs/{{ domain_name }}/privkey.pem"
+    privatekey_passphrase: "{{ lookup('ansible.builtin.password', 'certs/' ~ domain_name ~ '/passphrase.txt', length=25) }}"
+    certificate_path: "certs/{{ domain_name }}/cert.pem"
+    other_certificates:
+      - "certs/{{ domain_name }}/chain.pem"
+    state: present
+    mode: "0600"
+
+- name: Create JKS keystore
+  community.general.java_keystore:
+    name: "{{ domain_name }}"
+    dest: "certs/{{ domain_name }}/cert.jks"
+    keystore_type: jks
+    certificate_path: "certs/{{ domain_name }}/fullchain.pem"
+    private_key_path: "certs/{{ domain_name }}/privkey.pem"
+    private_key_passphrase: "{{ lookup('ansible.builtin.password', 'certs/' ~ domain_name ~ '/passphrase.txt', length=25) }}"
+    password: changeit

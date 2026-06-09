@@ -1,0 +1,13 @@
+---
+- name: Remove DNS Made Easy TXT challenge records
+  community.general.dnsmadeeasy:
+    account_key: "{{ dnsmadeeasy_api_key }}"
+    account_secret: "{{ dnsmadeeasy_secret_key }}"
+    state: absent
+    domain: "{{ item | regex_replace('^[^\\.]+\\.', '') }}"
+    record_type: TXT
+    record_ttl: 300
+    record_name: "{{ acme_challenge['challenge_data'][item][acme_challenge_type].record | regex_replace('^(_acme-challenge\\.[^\\.]+)\\..*$', '\\1') }}"
+    record_value: "{{ acme_challenge['challenge_data'][item][acme_challenge_type].resource_value }}"
+  loop: "{{ subject_alt_name }}"
+  when: item in acme_challenge.challenge_data

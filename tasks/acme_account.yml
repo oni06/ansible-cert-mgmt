@@ -1,0 +1,47 @@
+---
+- name: Check if ACME account key exists
+  ansible.builtin.stat:
+    path: "{{ acme_account_key }}"
+  register: acme_key_stat
+
+- name: Ensure account key directory exists
+  ansible.builtin.file:
+    path: "{{ acme_account_key | dirname }}"
+    state: directory
+    mode: "u=rwx,g=,o="
+  when: not acme_key_stat.stat.exists
+
+- name: Generate ACME account private key
+  community.crypto.openssl_privatekey:
+    path: "{{ acme_account_key }}"
+    type: RSA
+    size: 4096
+    mode: "0600"
+  when: not acme_key_stat.stat.exists
+
+- name: Register new ACME account
+  community.crypto.acme_account:
+    acme_directory: "{{ acme_directory }}"
+    acme_version: "{{ acme_version }}"
+    account_key_src: "{{ acme_account_key }}"
+    terms_agreed: true
+    state: present
+    contact:
+      - "mailto:{{ acme_email }}"
+  when: not acme_key_stat.stat.exists
+
+- name: Verify existing ACME account
+  community.crypto.acme_account_info:
+    acme_directory: "{{ acme_directory }}"
+    acme_version: "{{ acme_version }}"
+    account_key_src: "{{ acme_account_key }}"
+  register: account_data
+  when: acme_key_stat.stat.exists
+
+- name: Display ACME account status
+  ansible.builtin.debug:
+    msg:
+      - "URI: {{ account_data.account_uri }}"
+      - "Contact: {{ account_data.account.contact }}"
+      - "Status: {{ account_data.account.status }}"
+  when: acme_key_stat.stat.exists

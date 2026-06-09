@@ -1,0 +1,11 @@
+acme_challenge_type: dns-01
+acme_version: 2
+acme_email: your-team@example.com
+
+# Production Let's Encrypt
+acme_directory: https://acme-v02.api.letsencrypt.org/directory
+acme_account_key: account/prd-account.key
+
+# Staging Let's Encrypt (uncomment to use)
+# acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+# acme_account_key: account/stg-account.key
