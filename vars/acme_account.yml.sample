@@ -1,10 +1,17 @@
 acme_version: 2
 acme_email: your-team@example.com
 
-# Production Let's Encrypt
-acme_directory: https://acme-v02.api.letsencrypt.org/directory
-acme_account_key: account/prd-account.key
+# Let's Encrypt environment: production or staging
+# Override at runtime with: ansible-playbook main.yml -e letsencrypt_environment=staging
+letsencrypt_environment: production
 
-# Staging Let's Encrypt (uncomment to use)
-# acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
-# acme_account_key: account/stg-account.key
+_letsencrypt_endpoints:
+  production:
+    directory: https://acme-v02.api.letsencrypt.org/directory
+    account_key: account/prd-account.key
+  staging:
+    directory: https://acme-staging-v02.api.letsencrypt.org/directory
+    account_key: account/stg-account.key
+
+acme_directory: "{{ _letsencrypt_endpoints[letsencrypt_environment].directory }}"
+acme_account_key: "{{ _letsencrypt_endpoints[letsencrypt_environment].account_key }}"
